@@ -16,6 +16,9 @@ TRUE_VALUES = ('true', 'yes', 't', 'y', '1')
 FALSE_VALUES = ('false', 'no', 'f', 'n', '0')
 
 
+objs = {}
+
+
 def convert_bool(value):
     if value.lower() in TRUE_VALUES:
         return True
@@ -212,9 +215,7 @@ class BaseTournamentDataImporter(object):
         if expect_unique is None:
             expect_unique = self.expect_unique
         skipped_because_existing = 0
-        boolean_fields = [field.name for field in model._meta.get_fields()
-                          if hasattr(field, 'get_internal_type') and
-                          field.get_internal_type() == 'BooleanField']
+        boolean_fields = model.booleans
 
         for lineno, line in enumerate(reader, start=2):
 
