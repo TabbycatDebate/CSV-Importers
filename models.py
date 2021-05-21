@@ -5,6 +5,7 @@ class BaseModel:
 
     fields = set()
     defaults = {}
+    booleans = set()
 
     def __init__(self, api_url=None, token=None, url=None, **kwargs):
         self.obj = {k: self.defaults.get(k) for k in self.fields}
@@ -16,13 +17,15 @@ class BaseModel:
         self.url_kwargs = {}
 
         if 'tournament' in kwargs:
-            url_kwargs['tournament_slug'] = kwargs['tournament']['slug']
+            url_kwargs['tournament_slug'] = kwargs.pop('tournament')['slug']
         if 'round' in kwargs:
             url_kwargs['tournament_slug'] = kwargs['round']['url'].split("/")[-3]
-            url_kwargs['round_seq'] = kwargs['round']['seq']
+            url_kwargs['round_seq'] = kwargs.pop('round')['seq']
         for keyword, value in kwargs.items():
             if keyword in self.fields:
-                self.obj[keyword] = value
+                self.obj[keyword] = getattr(self, 'handle_%s' % keyword, 'handle_field')(value)
+            else:
+                raise FieldError("Unexpected field: " + keyword)
 
     def __getitem__(self, key):
         return self.obj[key]
@@ -36,6 +39,12 @@ class BaseModel:
     @property
     def auth_header(self):
         return {'Authorization': 'Token %s' % (self.token,)}
+
+    def handle_field(self, value):
+        return value
+
+    def handle_boolean(self, value):
+        return bool(value)
 
     def all(self):
         r = requests.get(self.model_url, headers=self.auth_header)
@@ -68,3 +77,17 @@ class VenueCategory(BaseModel):
     defaults = {'venues': []}
     prefix = '{tournament_slug}/venue-categories'
 
+
+class Venue(BaseModel):
+    fields = {'name', 'priority', 'categories'}
+    defaults = {'categories': []}
+    prefix = '{tournament_slug}/venues'
+
+
+class AdjudicatorFeedbackQuestion(BaseModel):
+    fields = {'seq', 'reference', 'name', 'text', 'answer_type', 'required', 'from_team', 'from_adj', 'min_value', 'max_value', 'choices'}
+    defaults = {'choices': []}
+    prefix = '{tournament_slug}/feedback-questions'
+
+    def handle_choices(self, value):
+        return value.split('//')
