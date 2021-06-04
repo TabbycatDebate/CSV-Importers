@@ -215,6 +215,39 @@ let fullImporter = (data, tournamentData) => {
 	});
 };
 
+let importTournament = (data, tournamentData) => {
+	const url = new URL(data.get('url'));
+	let tournamentJson = null;
+
+	// Test if tournament already exists
+	fetch(url.protocol + "//" + url.host + "/api/v1/tournaments/" + data.get('slug'), {
+		method: 'GET',
+		headers: {
+			'Content-Type': 'application/json',
+			'Authorization': 'Token ' + formData.get('api-token')
+		},
+	}).then(response => {
+		if (!response.ok) {
+			// Create tournament
+			fetch(url.protocol + "//" + url.host + "/api/v1/tournaments", {
+				method: 'GET',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': 'Token ' + formData.get('api-token')
+				},
+				body: JSON.stringify({
+					'name': data.get('tournament'),
+					'slug': data.get('slug'),
+					'active': true
+				}),
+			}).then(response => response.json())
+			.then(json => {tournamentData['tournament'] = json['url'];})
+			.catch(error => console.error('Error:', error));
+		}
+	})
+	.catch(error => console.error('Error:', error));
+};
+
 document.querySelector("form").addEventListener("submit", (e) => {
 	e.preventDefault();
 
@@ -225,5 +258,6 @@ document.querySelector("form").addEventListener("submit", (e) => {
 		'venue_categories': {}
 	};
 
+	importTournament(data, tournamentData);
 	fullImporter(data, tournamentData);
 });
