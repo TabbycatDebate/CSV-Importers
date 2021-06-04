@@ -215,10 +215,10 @@ let fullImporter = (data, tournamentData) => {
 	});
 };
 
-let importTournament = (e) => {
+document.querySelector("form").addEventListener("submit", (e) => {
 	e.preventDefault();
 
-	let data = new FormData(document.getElementById("import-form"));
+	let data = new FormData(document.querySelector("form"));
 	let tournamentData = {
 		'tournament': null,
 		'break_categories': {},
@@ -226,4 +226,4 @@ let importTournament = (e) => {
 	};
 
 	fullImporter(data, tournamentData);
-};
+});

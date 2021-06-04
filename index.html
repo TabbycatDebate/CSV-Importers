@@ -4,11 +4,10 @@
 	<title>Tabbycat Importer</title>
 	<meta charset="utf-8"/>
 	<script type="text/javascript" src="papaparse.min.js"></script>
-	<script src="import.js"></script>
 </head>
 <body>
 	<h1>Export to Tabbycat</h1>
-	<form onsubmit="importTournament()">
+	<form>
 		<ul>
 			<li><label for="url">Tabbycat URL<sup>*</sup>: </label><input type="text" name="url" id="url" required/></li>
 			<li><label for="tournament">Tournament name: </label><input type="text" id="tournament" name="tournament"/></li>
@@ -19,5 +18,6 @@
 		<button type="submit">Submit</button>
 	</form>
 	<ul id="activity"></ul>
+	<script src="import.js"></script>
 </body>
 </html>
