@@ -110,7 +110,7 @@ let created = (key, value, dict) => (r) => {
 
 let insertFromCSV = (formData, tournamentData, file, value, cb) => {
 	Papa.parse(file, {
-		headers: true,
+		header: true,
 		dynamicTyping: true,
 		step: (r, parser) => {
 			let data = cb(tournamentData, r.data);
@@ -183,7 +183,7 @@ let importVenue = (tournamentData, r) => {
 
 let fullImporter = (data, tournamentData) => {
 	let files = {};
-	for (file in data.getAll("csvs"))
+	for (file of data.getAll("csvs"))
 		files[file.name.slice(0, -4)] = file;
 
 	let object_types = [
