@@ -108,7 +108,7 @@ let created = (key, value, dict) => (r) => {
 	processList.appendChild(li);
 };
 
-let insertFromCSV = (formData, tournamentData, file, value, cb = (_,r) => r) => {
+let insertFromCSV = (formData, tournamentData, file, value, cb) => {
 	Papa.parse(file, {
 		headers: true,
 		dynamicTyping: true,
@@ -181,7 +181,7 @@ let importVenue = (tournamentData, r) => {
 	return r;
 };
 
-let anorakImporter = (data, tournamentData) => {
+let fullImporter = (data, tournamentData) => {
 	let files = {};
 	for (file in data.getAll("csvs"))
 		files[file.name.slice(0, -4)] = file;
@@ -191,43 +191,24 @@ let anorakImporter = (data, tournamentData) => {
 		['venues', 'name', importVenue],
 		['institutions', 'code'],
 		['break_categories', 'slug', importBreakCategory],
+		['speaker_categories', 'slug', importSpeakerCategories],
 		'teams',
 		'speakers',
 		['adjudicators', 'name', importAdjudicator],
+		'scores',
 		['rounds', 'abbreviation', importRound],
 		['motions', 'reference', importMotion],
 		'sides',
 		['adj_feedback_questions', 'reference', importFeedbackQuestion],
 		'adj_venue_constraints',
 		'team_venue_constraints',
-	].forEach(t => {
-		if (typeof t === 'array') {
-			insertFromCSV(data, tournamentData, files[t[0]], t[1], t[2] ?? (_, r) => r);
-		} else {
-			//
-		}
-	});
-};
-
-let bootsImporter = (data, tournamentData) => {
-	let object_types = [
-		['break_categories', 'slug', importBreakCategory],
-		['rounds', 'abbreviation', importRound],
-		['institutions', 'code'],
-		['speaker_categories', 'slug', importSpeakerCategories],
-		['adjudicators', 'name', importAdjudicator],
-		'scores',
-		'teams',
-		['venues', 'name', importVenue],
 		'team_conflicts',
 		'institution_conflicts',
 		'adjudicator_conflicts',
 		'team_institution_conflicts',
-		['adj_feedback_questions', 'reference', importFeedbackQuestion],
-		['motions', 'reference', importMotion]
 	].forEach(t => {
 		if (typeof t === 'array') {
-			insertFromCSV(data, tournamentData, files[t[0]], t[1], t[2] ?? (_, r) => r);
+			insertFromCSV(data, tournamentData, files[t[0]], t[1], t[2] ?? ((_, r) => r));
 		} else {
 			//
 		}
@@ -244,15 +225,5 @@ let importTournament = (e) => {
 		'venue_categories': {}
 	};
 
-	switch (data.get('method')) {
-		case 'anorak':
-			anorakImporter(data, tournamentData);
-			break;
-		case 'boots':
-			bootsImporter(data, tournamentData);
-			break;
-		default:
-			anorakImporter(data, tournamentData);
-			break;
-	}
+	fullImporter(data, tournamentData);
 };
