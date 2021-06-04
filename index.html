@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Tabbycat Importer</title>
+	<meta charset="utf-8"/>
+	<script src="import.js"></script>
+</head>
+<body>
+	<h1>Export to Tabbycat</h1>
+	<form onsubmit="importTournament()">
+		<ul>
+			<li><label for="url">Tabbycat URL<sup>*</sup>: </label><input type="text" name="url" id="url" required/></li>
+			<li><label for="tournament">Tournament name: </label><input type="text" id="tournament" name="tournament"/></li>
+			<li><label for="slug">Slug<sup>*</sup>: </label><input type="text" name="slug" id="slug" required/></li>
+			<li><label for="api-token">API Token<sup>*</sup>: </label><input type="text" name="api-token" id="api-token" required/></li>
+			<li><label for="csvs">CSV File(s)<sup>*</sup>: </label><input type="file" name="csvs" id="csvs" multiple required/></li>
+		</ul>
+		<button type="submit">Submit</button>
+	</form>
+	<ul id="activity"></ul>
+</body>
+</html>
