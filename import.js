@@ -181,6 +181,35 @@ let importVenue = (tournamentData, r) => {
 	return r;
 };
 
+let importTeams = (tournamentData, r) => {
+	let team = {
+		institution: tournamentData.institutions[r.institution] ?? null,
+		break_categories: (r.break_category ?? '').split(";").map(c => tournamentData.break_categories[c]),
+		institution_conflicts: (r.institution_conflicts ?? '').split(";").map(c => tournamentData.institutions[c]),
+		reference: r.reference,
+		code_name: r.code_name,
+		emoji: r.emoji,
+		speakers: [],
+	};
+	team.use_institution_prefix = BOOLEANS[r.use_institution_prefix] ?? bool(team.institution);
+
+	let i = 1;
+	while (r[`speaker${i}_name`]) {
+		team.speakers.push({
+			name: r[`speaker${i}_name`],
+			email: r[`speaker${i}_email`],
+			phone: r[`speaker${i}_phone`],
+			anonymous: BOOLEANS[r[`speaker${i}_anonymous`]] ?? false,
+			code_name: r[`speaker${i}_code_name`],
+			url_key: r[`speaker${i}_url_key`],
+			gender: GENDERS[r[`speaker${i}_gender`]] ?? '',
+			pronoun: r[`speaker${i}_pronoun`],
+			categories: (r[`speaker${i}_category`] ?? '').split(";").map(c => tournamentData.speaker_categories[c]),
+		});
+	}
+	return team;
+}
+
 let fullImporter = (data, tournamentData) => {
 	let files = {};
 	for (file of data.getAll("csvs"))
@@ -192,7 +221,7 @@ let fullImporter = (data, tournamentData) => {
 		['institutions', 'code'],
 		['break_categories', 'slug', importBreakCategory],
 		['speaker_categories', 'slug', importSpeakerCategories],
-		'teams',
+		['teams', 'reference', importTeams],
 		'speakers',
 		['adjudicators', 'name', importAdjudicator],
 		'scores',
