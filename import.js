@@ -93,41 +93,13 @@ const fileNames = {
 	"rounds": "rounds",
 	"scores": null,
 	"speaker_categories": "speaker-categories",
-	"speakers": null,
+	"speakers": "speakers",
 	"team_conflicts": null,
 	"team_venue_constraints": null,
 	"teams": "teams",
 	"venue_categories": "venue-categories",
 	"venues": "venues"
 }
-
-let created = (key, value, dict) => (r) => {
-	dict[key][value] = r.url;
-	let li = document.createElement("li");
-	li.innerText = "Created " + r[value];
-	processList.appendChild(li);
-};
-
-let insertFromCSV = (formData, tournamentData, file, value, cb) => {
-	Papa.parse(file, {
-		header: true,
-		dynamicTyping: true,
-		step: (r, parser) => {
-			let data = cb(tournamentData, r.data);
-
-			fetch(tournamentData['tournament'] + "/" + fileNames[file.name.slice(0, -4)], {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'Authorization': 'Token ' + formData.get('api-token')
-				},
-				body: JSON.stringify(data),
-			}).then(response => response.json())
-			.then(created(file.name.slice(0, -4), value, tournamentData))
-			.catch(error => console.error('Error:', error));
-		}
-	});
-};
 
 let importFeedbackQuestion = (tournamentData, r) => {
 	r.answer_type = ANSWER_TYPES[r.answer_type];
@@ -138,8 +110,15 @@ let importFeedbackQuestion = (tournamentData, r) => {
 	return r;
 };
 
+let importInstitution = (tournamentData, r) => {
+	let url = tournamentData.tournament.split('/').slice(0, -2);
+	url.push('institutions');
+	r._url = url.join('/');
+	return r;
+};
+
 let importAdjudicator = (tournamentData, r) => {
-	r.institution = tournamentData.institutions[r.institution];
+	r.institution = tournamentData.institutions?.[r.institution];
 	r.adj_core = BOOLEANS[r.adj_core];
 	r.independent = BOOLEANS[r.independent];
 	return r;
@@ -151,7 +130,7 @@ let importBreakCategory = (tournamentData, r) => {
 };
 
 let importMotion = (tournamentData, r) => {
-	r.rounds = {"round": tournamentData.rounds[r.rounds], "seq": r.seq};
+	r.rounds = {"round": tournamentData.rounds?.[r.rounds], "seq": r.seq};
 	delete r.seq;
 	return r;
 }
@@ -160,7 +139,7 @@ let importRound = (tournamentData, r) => {
 	r.stage = ROUND_STAGES[r.stage];
 	r.silent = BOOLEANS[r.silent];
 	r.draw_type = DRAW_TYPES[r.draw_type];
-	r.break_category = tournamentData.break_categories[r.break_category];
+	r.break_category = tournamentData.break_categories?.[r.break_category];
 	return r;
 };
 
@@ -176,14 +155,14 @@ let importVenueCategory = (tournamentData, r) => {
 };
 
 let importVenue = (tournamentData, r) => {
-	r.categories = [tournamentData.venue_categories[r.category]];
+	r.categories = [...(tournamentData.venue_categories?.[r.category] ?? [])];
 	delete r.category;
 	return r;
 };
 
 let importTeams = (tournamentData, r) => {
 	let team = {
-		institution: tournamentData.institutions[r.institution] ?? null,
+		institution: tournamentData.institutions?.[r.institution] ?? null,
 		break_categories: (r.break_category ?? '').split(";").map(c => tournamentData.break_categories[c]),
 		institution_conflicts: (r.institution_conflicts ?? '').split(";").map(c => tournamentData.institutions[c]),
 		reference: r.reference,
@@ -204,89 +183,199 @@ let importTeams = (tournamentData, r) => {
 			url_key: r[`speaker${i}_url_key`],
 			gender: GENDERS[r[`speaker${i}_gender`]] ?? '',
 			pronoun: r[`speaker${i}_pronoun`],
-			categories: (r[`speaker${i}_category`] ?? '').split(";").map(c => tournamentData.speaker_categories[c]),
+			categories: (r[`speaker${i}_category`] ?? '').split(";").map(c => tournamentData.speaker_categories?.[c]),
 		});
-	}
+	};
 	return team;
-}
+};
 
-let fullImporter = (data, tournamentData) => {
+let importSpeakers = (tournamentData, r) => {
+	return {
+		team: Object.values(tournamentData.teams).filter(
+			t => t.reference === r.team_name &&
+			t.institution === tournamentData.institutions?.[r.institution] &&
+			t.use_institution_prefix === (BOOLEANS[r.use_institution_prefix] ?? false)
+		)[0],
+		name: r.name,
+		email: r.email,
+		phone: r.phone,
+		anonymous: BOOLEANS[r.anonymous] ?? false,
+		code_name: r.code_name,
+		url_key: r.url_key,
+		gender: r.gender,
+		pronoun: r.pronoun,
+		categories: (r.category ?? '').split(";").map(c => tournamentData.speaker_categories?.[c]),
+	};
+};
+
+let importAdjScores = (tournamentData, r) => {
+	return {
+		_method: 'PATCH',
+		_url: tournamentData.adjudicators?.[r.adjudicator],
+		base_score: r.score,
+	};
+};
+
+let importAdjVenueConstraints = (tournamentData, r) => {
+	return {
+		_method: 'PATCH',
+		_url: tournamentData.adjudicators?.[r.adjudicator],
+		venue_constraints: [{
+			category: tournamentData.venue_categories?.[r.category],
+			priority: r.priority,
+		}],
+	};
+};
+
+let importTeamVenueConstraints = (tournamentData, r) => {
+	return {
+		_method: 'PATCH',
+		_url: tournamentData.teams[r.team],
+		venue_constraints: [{
+			category: tournamentData.venue_categories?.[r.category],
+			priority: r.priority,
+		}],
+	};
+};
+
+let importTeamConflicts = (tournamentData, r) => {
+	return {
+		_method: 'PATCH',
+		_url: tournamentData.adjudicators?.[r.adjudicator],
+		team_conflicts: [tournamentData.teams?.[r.team]],
+	};
+};
+
+let importInstitutionConflicts = (tournamentData, r) => {
+	return {
+		_method: 'PATCH',
+		_url: tournamentData.adjudicators?.[r.adjudicator],
+		team_conflicts: [tournamentData.institutions?.[r.institution]],
+	};
+};
+
+let importAdjudicatorConflicts = (tournamentData, r) => {
+	return {
+		_method: 'PATCH',
+		_url: tournamentData.adjudicators?.[r.adjudicator1],
+		team_conflicts: [tournamentData.adjudicators?.[r.adjudicator2]],
+	};
+};
+
+let importTeamInstitutionConflicts = (tournamentData, r) => {
+	return {
+		_method: 'PATCH',
+		_url: tournamentData.teams?.[r.team],
+		team_conflicts: [tournamentData.institutions?.[r.institution]],
+	};
+};
+
+let created = (key, value, dict) => (r) => {
+	dict[key][r[value]] = r.url;
+	let li = document.createElement("li");
+	li.innerText = "Created " + r[value];
+	processList.appendChild(li);
+};
+
+let insertFromCSV = (formData, tournamentData, file, value, cb) => {
+	if (!file) {
+		return;
+	}
+	tournamentData[file.name.slice(0, -4)] = {};
+	Papa.parse(file, {
+		header: true,
+		dynamicTyping: true,
+		skipEmptyLines: 'greedy',
+		step: (r, parser) => {
+			let { _method, _url, ...body } = cb(tournamentData, r.data);
+
+			const url = _url ?? tournamentData.tournament + "/" + fileNames[file.name.slice(0, -4)];
+			const method = _method ?? 'POST';
+
+			fetch(url, {
+				method,
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': 'Token ' + formData.get('api-token')
+				},
+				body: JSON.stringify(body),
+			}).then(response => response.json())
+			.then(created(file.name.slice(0, -4), value, tournamentData))
+			.catch(error => console.error('Error:', error));
+		}
+	});
+};
+
+let fullImporter = async (data, tournamentData) => {
 	let files = {};
-	for (file of data.getAll("csvs"))
+	for (const file of data.getAll("csvs"))
 		files[file.name.slice(0, -4)] = file;
 
 	let object_types = [
 		['venue_categories', 'name', importVenueCategory],
 		['venues', 'name', importVenue],
-		['institutions', 'code'],
+		['institutions', 'code', importInstitution],
 		['break_categories', 'slug', importBreakCategory],
 		['speaker_categories', 'slug', importSpeakerCategories],
 		['teams', 'reference', importTeams],
-		'speakers',
+		['speakers', 'name', importSpeakers],
 		['adjudicators', 'name', importAdjudicator],
-		'scores',
+		['scores', null, importAdjScores],
 		['rounds', 'abbreviation', importRound],
 		['motions', 'reference', importMotion],
 		'sides',
 		['adj_feedback_questions', 'reference', importFeedbackQuestion],
-		'adj_venue_constraints',
-		'team_venue_constraints',
-		'team_conflicts',
-		'institution_conflicts',
-		'adjudicator_conflicts',
-		'team_institution_conflicts',
+		['adj_venue_constraints', null, importAdjVenueConstraints],
+		['team_venue_constraints', null, importTeamVenueConstraints],
+		['team_conflicts', null, importTeamConflicts],
+		['institution_conflicts', null, importInstitutionConflicts],
+		['adjudicator_conflicts', 'adjudicator1', importAdjudicatorConflicts],
+		['team_institution_conflicts', null, importTeamInstitutionConflicts],
 	].forEach(t => {
-		if (typeof t === 'array') {
-			insertFromCSV(data, tournamentData, files[t[0]], t[1], t[2] ?? ((_, r) => r));
+		if (Array.isArray(t)) {
+			insertFromCSV(data, tournamentData, files[t[0]], t[1], t[2]);
 		} else {
-			//
+			// 'sides' not supported
 		}
 	});
 };
 
-let importTournament = (data, tournamentData) => {
+let importTournament = async (data) => {
 	const url = new URL(data.get('url'));
-	let tournamentJson = null;
-
 	// Test if tournament already exists
-	fetch(url.protocol + "//" + url.host + "/api/v1/tournaments/" + data.get('slug'), {
+	const getRequest = await fetch(url.protocol + "//" + url.host + "/api/v1/tournaments/" + data.get('slug'), {
 		method: 'GET',
 		headers: {
 			'Content-Type': 'application/json',
-			'Authorization': 'Token ' + formData.get('api-token')
+			'Authorization': 'Token ' + data.get('api-token')
 		},
-	}).then(response => {
-		if (!response.ok) {
-			// Create tournament
-			fetch(url.protocol + "//" + url.host + "/api/v1/tournaments", {
-				method: 'GET',
-				headers: {
-					'Content-Type': 'application/json',
-					'Authorization': 'Token ' + formData.get('api-token')
-				},
-				body: JSON.stringify({
-					'name': data.get('tournament'),
-					'slug': data.get('slug'),
-					'active': true
-				}),
-			}).then(response => response.json())
-			.then(json => {tournamentData['tournament'] = json['url'];})
-			.catch(error => console.error('Error:', error));
-		}
 	})
-	.catch(error => console.error('Error:', error));
+	if (getRequest.ok) {
+		return (await getRequest.json()).url;
+	}
+
+	// Create tournament
+	const createRequest = await fetch(url.protocol + "//" + url.host + "/api/v1/tournaments", {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'Authorization': 'Token ' + data.get('api-token')
+		},
+		body: JSON.stringify({
+			'name': data.get('tournament'),
+			'slug': data.get('slug'),
+			'active': true
+		})
+	});
+	return (await createRequest.json()).url;
 };
 
-document.querySelector("form").addEventListener("submit", (e) => {
+document.querySelector("form").addEventListener("submit", async (e) => {
 	e.preventDefault();
 
 	let data = new FormData(document.querySelector("form"));
 	let tournamentData = {
-		'tournament': null,
-		'break_categories': {},
-		'venue_categories': {}
+		'tournament': await importTournament(data),
 	};
-
-	importTournament(data, tournamentData);
-	fullImporter(data, tournamentData);
+	await fullImporter(data, tournamentData);
 });
